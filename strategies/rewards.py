@@ -1,7 +1,7 @@
 """
 Strategies for what to do with accumulated rewards.
 """
-from typing import Callable, Optional, Tuple
+from typing import Optional, Tuple
 
 
 def sell_rewards(
@@ -40,7 +40,7 @@ class RewardsStrategy:
     def __init__(self, sell_amount: float) -> None:
         """
         Args:
-            rewards_fn: Which function to exercise on each epoch.
+            sell_amount: How much (from 0-1) to sell off every step
         """
         self._rewards_sell_amount = sell_amount
 
@@ -79,8 +79,8 @@ class SellRewardsStrategy(RewardsStrategy):
 class CompoundRewardsStrategy(RewardsStrategy):
     """Compounds rewards on every epoch"""
 
-    def __init__(self, rewards_fn: Callable, sell_amount: float) -> None:
-        super().__init__(rewards_fn, sell_amount)
+    def __init__(self, sell_amount: float) -> None:
+        super().__init__(sell_amount)
 
     def execute(
         self,
