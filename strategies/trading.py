@@ -22,6 +22,7 @@ class HODLStrategy(TradingStrategy):
 
     def __init__(self) -> None:
         super().__init__()
+        self._invested = True
 
     def execute(
         self,
@@ -63,6 +64,7 @@ class RebalanceStrategy(TradingStrategy):
         self._fee_swap = fee_swap
         self._fee_gas = fee_gas
         self._initial_price = price_anchor
+        self._invested = True
 
     def execute(
         self,
@@ -95,11 +97,11 @@ class RebalanceStrategy(TradingStrategy):
 
         # Rebalance if deviation exceeds threshold
         if price_delta > self._threshold:
-            print(
-                f"Price Delta {price_delta} exceeded threshold {self._threshold}. "
-                f"cur_price={token1_price}, anchor_price={self._price_anchor}. "
-                f"Rebalancing."
-            )
+            # print(
+            #     f"Price Delta {price_delta} exceeded threshold {self._threshold}. "
+            #     f"cur_price={token1_price}, anchor_price={self._price_anchor}. "
+            #     f"Rebalancing."
+            # )
 
             # Close the position
             token_supply, token_debt, cash_close, fees_close = remove_liquidity(

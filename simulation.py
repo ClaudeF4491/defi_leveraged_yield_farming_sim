@@ -11,7 +11,7 @@ import pandas as pd
 from strategies.core import add_liquidity
 from strategies.rewards import RewardsStrategy
 from strategies.trading import TradingStrategy
-from typing import Optional
+from typing import Any, Dict, Optional
 from util import iloss_amt
 
 
@@ -51,6 +51,7 @@ def enrich_columns(df: pd.DataFrame) -> pd.DataFrame:
         "iloss",
         "position_hodl_dollars",
         "trade_event",
+        "invested",
         "strategy_metadata",
     ]
     df[cols] = np.nan
@@ -64,6 +65,7 @@ def simulate(
     rewards_cls: RewardsStrategy,
     initial_cap: float,
     leverage: float,
+    start_date: Optional[pd.Timestamp] = None,
     fee_gas: float = 0.0,
     fee_swap: float = 0.003,
     reward_token_price: Optional[float] = None,
@@ -122,6 +124,7 @@ def simulate(
     token0_debt_initial = 0
     token1_debt_initial = 0
     cash_accum = initial_cap
+    fees_open = 0
 
     # Optionally open the position
     if open_on_start:
@@ -154,13 +157,19 @@ def simulate(
     last_token1_supply = token1_supply_initial
     last_token0_debt = token0_debt_initial
     last_token1_debt = token1_debt_initial
-    first_date = df.iloc[0].name
+
+    # Filter to after the start date of interest
+    df_eval = df[df.index >= start_date]  # Only process after start date provided
+
+    # Calculate HODL tokens (split 50/50 but not in LP) based on this start date
+    token0_supply_hodl = (initial_cap / 2) / df_eval["token0_price"][0]
+    token1_supply_hodl = (initial_cap / 2) / df_eval["token1_price"][0]
 
     # Loop epoch-by-epoch and calculate changes over time
-    for idx, row in df.iterrows():
+    for idx, row in df_eval.iterrows():
         # Derive ratio of token B divided by token A. Provides price of A relative to B
         cur_date = row.name
-        days_elapsed = (cur_date - first_date).days + 1
+        days_elapsed = (cur_date - start_date).days + 1
         token0_price = row["token0_price"]
         token1_price = row["token1_price"]
         reward_token_price = row["reward_token_price"]
@@ -333,13 +342,18 @@ def simulate(
             equity_value - initial_cap
         )  # PnL is total gains/losses minus initial investment
         roi = profit_value / initial_cap
-        debt_ratio = debt_value / (debt_value + pool_equity)
+        denom = debt_value + pool_equity
+        debt_ratio = 0
+        if denom != 0 and ~pd.isna(denom):
+            debt_ratio = debt_value / denom
         # See francium reference. We do not include rewards or cash here since they
         # aren't in the pool.
         annualized_apr = (1.0 + (profit_value / initial_cap)) ** (
             365 / days_elapsed
         ) - 1
-        effective_leverage = pool_value / pool_equity
+        effective_leverage = 0
+        if pool_equity != 0 and ~pd.isna(pool_equity):
+            effective_leverage = pool_value / pool_equity
 
         """
         Calulate raw impermament loss, without considering rewards
@@ -357,8 +371,8 @@ def simulate(
 
         # Calculate what we would have had if we just HODL'd the original tokens (x, y)
         position_hodl_dollars = (
-            token0_price * token0_supply_initial + token1_price * token1_supply_initial
-        ) / leverage
+            token0_price * token0_supply_hodl + token1_price * token1_supply_hodl
+        )
 
         """
         Record current state
@@ -396,6 +410,7 @@ def simulate(
             "iloss": iloss,
             "position_hodl_dollars": position_hodl_dollars,
             "trade_event": trade_occurred,
+            "invested": strategy_cls._invested,
             "strategy_metadata": strategy_metadata,
         }
 
@@ -409,3 +424,17 @@ def simulate(
         last_token1_debt = token1_debt_close
 
     return df
+
+
+def summarize_results(df: pd.DataFrame) -> Dict[str, Any]:
+    final_row = df.iloc[-1]
+    summary = {
+        "capital_final": final_row["equity_value"],
+        "final_profit": final_row["profit_value"],
+        "final_annualized_apr": final_row["annualized_apr"] * 100,
+        "days_elapsed": (df.index[-1] - df.index[0]).days + 1,
+        "days_in_position": df.invested.sum(),
+        "num_trade_strategy_executions": df["trade_event"].sum(),
+        "capital_final_if_hodl": df["position_hodl_dollars"][-1],
+    }
+    return summary
