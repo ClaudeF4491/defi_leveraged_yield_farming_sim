@@ -432,6 +432,7 @@ def summarize_results(df: pd.DataFrame) -> Dict[str, Any]:
         "capital_final": final_row["equity_value"],
         "final_profit": final_row["profit_value"],
         "final_annualized_apr": final_row["annualized_apr"] * 100,
+        "final_roi": final_row["roi"] * 100,
         "days_elapsed": (df.index[-1] - df.index[0]).days + 1,
         "days_in_position": df.invested.sum(),
         "num_trade_strategy_executions": df["trade_event"].sum(),

@@ -132,7 +132,13 @@ def get_binance_klines(
 
     BINANCE_KLINES_URL = "https://www.binance.com/api/v3/klines"
 
-    params = dict(interval=candle_size, symbol=symbol, limit=limit)
+    params = dict(
+        interval=candle_size,
+        symbol=symbol,
+        startTime=int(start_time * 1000),
+        endTime=int(end_time * 1000),
+        limit=limit,
+    )
     resp = requests.get(BINANCE_KLINES_URL, params=params)
     resp_json = resp.json()
     df = pd.DataFrame(resp_json)
